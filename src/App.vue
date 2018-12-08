@@ -85,7 +85,16 @@
          <span id="camera-icon">
            <i class="fas fa-camera"></i>
          </span> Scan
-          <input type=file accept="image/*" capture=environment @onclick="openCamera(this)" onchange="" tabindex=-1>
+          <input type=file accept="image/*" capture=environment @click="openCamera(this)" onchange="" tabindex=-1>
+        </button>
+        <button class="button is-primary" @click="createID">
+          create id
+        </button>
+        <button class="button is-primary" @click="createAccount">
+          create Account
+        </button>
+        <button class="button is-primary" @click="importAccount">
+          import Account
         </button>
       </div>
     </div>
@@ -95,9 +104,70 @@
 <script>
   /* eslint-disable no-undef */
 
+  import {Identity, Crypto, OntidContract, RestClient, CONST, Account} from 'ontology-ts-sdk'
+
+  // wallet
+
   export default {
     name: 'app',
     methods: {
+      createAccount () {
+        const keyParameters = new Crypto.KeyParameters(Crypto.CurveLabel.SECP256R1)
+        console.log(keyParameters)
+        const privateKey = Crypto.PrivateKey.random(Crypto.KeyType.ECDSA, keyParameters)
+        console.log(privateKey)
+        const account = Account.create(privateKey, 'hogefuga', 'test')
+        console.log(account.toJson())
+        return account
+      },
+      importAccount () {
+        const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
+        const account = Account.parseJson(jsonStr)
+        console.log(account)
+        return account
+      },
+      createID () {
+        // generate a random private key
+        // const privateKey = Crypto.PrivateKey.random()
+        // console.log(privateKey)
+        const password = 'hogefuga'
+        // const label = 'test'
+
+        // const identity = Identity.create(privateKey, password, label)
+        const identity = Identity.parseJson('{"ontid":"did:ont:AaXidkKV9HrR5dxTJ4WNkg19NSRyc5AHf7","label":"test","lock":false,"isDefault":false,"controls":[{"id":"1","algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"QZ0U2wiPaMquYyaeA1aFXVXz9gMvry3kwspdT1HOMVKqJEmeaoRZ80xn3N0jigfp","address":"AaXidkKV9HrR5dxTJ4WNkg19NSRyc5AHf7","salt":"d4UIuQZ9q6JghFc7eFzZhQ==","enc-alg":"aes-256-gcm","hash":"sha256","publicKey":"02c3544b8ea736920e7d158349144f7cbe08996ca3b685fa79b11c4776518518be"}]}')
+        console.log(identity.toJson())
+        console.log(identity.ontid)
+        const did = identity.ontid
+
+        console.log(identity.controls[0].address)
+        const _pk = identity.controls[0].publicKey
+        const pk = new Crypto.PublicKey(_pk)
+
+        // const pk = privateKey.getPublicKey()
+        // console.log(pk)
+        const gasPrice = '500'
+        const gasLimit = '20000'
+        const tx = OntidContract.buildRegisterOntidTx(did, pk, gasPrice, gasLimit)
+        identity.signTransaction(password, tx)
+
+        // TransactionBuilder.signTransaction(tx, privateKey)
+  
+        /* const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
+        const account = Account.parseJson(jsonStr)
+        console.log(`address: ${account.address.value}`)
+
+        tx.payer = account.address
+        const signedTx = account.signTransaction('hogefuga', tx)
+        // TransactionBuilder.addSign(tx, privateKeyOfAccount)
+
+        */
+
+        const rest = new RestClient(CONST.TEST_ONT_URL.REST_URL)
+        rest.sendRawTransaction(tx.serialize()).then(res => {
+          console.log(res)
+          alert('hoge')
+        })
+      },
       openCamera (node) {
         const reader = new FileReader()
         reader.onload = function () {
