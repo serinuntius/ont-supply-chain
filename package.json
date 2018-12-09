@@ -11,6 +11,7 @@
     "lint": "eslint --ext .js,.vue src"
   },
   "dependencies": {
+    "ontology-dapi": "^0.4.6",
     "ontology-ts-sdk": "^1.0.9",
     "vue": "^2.5.2",
     "vue-router": "^3.0.1"

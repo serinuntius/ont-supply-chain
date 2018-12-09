@@ -91,6 +91,12 @@
          </span> Scan
           <input type=file accept="image/*" capture=environment @click="openCamera($event)" onchange="" tabindex=-1>
         </button>
+        <button class="button is-primary" @click="registerUser">
+          register User
+        </button>
+        <button class="button is-primary" @click="registerItem">
+          register item
+        </button>
         <button class="button is-primary" @click="createID2">
           create id
         </button>
@@ -110,14 +116,64 @@
 
 <script>
   /* eslint-disable no-undef */
+  import { Identity, Crypto, OntidContract, RestClient, CONST, Account, TransactionBuilder, utils } from 'ontology-ts-sdk'
+  import { client } from 'ontology-dapi'
 
-  import {Identity, Crypto, OntidContract, RestClient, CONST, Account, TransactionBuilder} from 'ontology-ts-sdk'
+  client.registerClient({})
 
   // wallet
 
   let scanner = new Instascan.Scanner({ video: document.getElementById('preview') })
-  scanner.addListener('scan', function (content) {
-    console.log(content)
+  scanner.addListener('scan', async function (uuid) {
+    console.log(uuid)
+    alert(uuid)
+
+    // register ONT ID
+
+    const password = 'hogefuga'
+    const label = 'test'
+    const privateKey = Crypto.PrivateKey.random()
+
+    const identity = Identity.create(privateKey, password, label)
+    console.log(identity.toJson())
+
+    const did = identity.ontid
+    // we need the public key, which can be generate from private key
+    const pk = privateKey.getPublicKey()
+    const gasPrice = '500'
+    const gasLimit = '20000'
+    const tx = OntidContract.buildRegisterOntidTx(did, pk, gasPrice, gasLimit)
+
+    const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
+    const account = Account.parseJson(jsonStr)
+
+    tx.payer = account.address
+    // First, we need sign transaction with the private key of the ONT ID.
+    TransactionBuilder.signTransaction(tx, privateKey)
+    // Then sign the transaction with payer's account
+    // we already got transaction created before,add the signature.
+
+    TransactionBuilder.addSign(tx, account.exportPrivateKey(password))
+    const rest = new RestClient(CONST.TEST_ONT_URL.REST_URL)
+    const res = await rest.sendRawTransaction(tx.serialize())
+    console.log(`ont_id_register`)
+    console.log(res)
+  
+    // ONT ID REGISTER END
+  
+    const operation = 'RegisterItem'
+    const args = [{type: 'String', value: 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj'}, { type: 'String', value: identity.ontid }, { type: 'String', value: uuid }]
+    console.log(args)
+    // const gasPrice = 500
+    // const gasLimit = 30000
+
+    const result = await client.api.smartContract.invoke({ scriptHash, operation, args, gasPrice, gasLimit })
+    console.log(result)
+    const msg = utils.hexstr2str(result.result[0])
+    console.log(result.result)
+    console.log(utils.hexstr2str(result.result[0]))
+    console.log(result)
+    alert(msg)
   })
 
   Instascan.Camera.getCameras().then(function (cameras) {
@@ -130,9 +186,34 @@
     console.error(e)
   })
 
+  const scriptHash = '8f512f0bb6fad262104794020d3ccace8079f692'
+
 export default {
     name: 'app',
     methods: {
+      async registerUser () {
+        const operation = 'RegisterUser'
+        const args = [{ type: 'String', value: 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj' }, { type: 'String', value: 'Tokyo Super Market' }]
+        const gasPrice = 500
+        const gasLimit = 30000
+
+        const result = await client.api.smartContract.invoke({ scriptHash, operation, args, gasPrice, gasLimit })
+        console.log(result)
+      },
+      async registerItem () {
+        // user_id, _uuid
+        const operation = 'RegisterItem'
+        const args = [{ type: 'String', value: 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj' }, { type: 'String', value: 'f60d7db1-e891-4149-abc6-7874a613605e' }]
+        const gasPrice = 500
+        const gasLimit = 30000
+
+        const result = await client.api.smartContract.invoke({ scriptHash, operation, args, gasPrice, gasLimit })
+
+        console.log(result)
+        console.log(result.result)
+        console.log(utils.hexstr2str(result.result[0]))
+        console.log(result)
+      },
       createAccount () {
         const keyParameters = new Crypto.KeyParameters(Crypto.CurveLabel.SECP256R1)
         console.log(keyParameters)
@@ -176,7 +257,7 @@ export default {
         TransactionBuilder.signTransaction(tx, privateKey)
         // Then sign the transaction with payer's account
         // we already got transaction created before,add the signature.
-
+  
         TransactionBuilder.addSign(tx, account.exportPrivateKey(password))
         const rest = new RestClient(CONST.TEST_ONT_URL.REST_URL)
         rest.sendRawTransaction(tx.serialize()).then(res => {
