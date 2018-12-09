@@ -26,18 +26,29 @@ def Main(operation, args):
         domain = args[0]
         return DeleteDomain(domain)
 
-    
-    if operation == 'RegisterUser':
-        user_id = args[0]        
-        position = args[1]  
 
-        RegisterUser(user_id, position)
+    if operation == 'RegisterUser':
+        user_id = args[0]
+        position = args[1]
+
+        return RegisterUser(user_id, position)
 
 
     if operation == 'RegisterItem':
         user_id = args[0]
-        uuid = args[1]
-        RegisterItem(user_id, uuid)
+        ont_id = args[1]
+        uuid = args[2]
+
+        return RegisterItem(user_id, ont_id, uuid)
+
+    if operation == 'GetPosition':
+        user_id = args[0]
+
+        return GetPosition(user_id)
+
+    if operation == 'GetItem':
+        uuid = args[0]
+        return GetItem(uuid)
 
     return False
 
@@ -60,7 +71,28 @@ def RegisterUser(user_id, position):
 
     Put(ctx, user_id, position)
 
-def RegisterItem(user_id, _uuid):
+    return True
+
+def GetPosition(user_id):
+    ctx = GetContext()
+    position = Get(ctx, user_id)
+    Notify(['position', position])
+    return True
+
+def GetItem(uuid):
+    ctx = GetContext()
+    item = Get(ctx, uuid)
+    if item == None:
+        Notify('not found item')
+        return False
+
+    item = Deserialize(item)
+    #Notify(['Item', item['user_id'], item['ont_id'], item['position'], item['timestamp']])
+
+    Notify(['Item', item['user_id'], item['ont_id'], item['position'], item['timestamp']])
+    return item['user_id'], item['ont_id'], item['position'], item['timestamp']]
+
+def RegisterItem(user_id,ont_id, _uuid):
     ctx = GetContext()
     timestamp = GetTime()
 
@@ -71,22 +103,25 @@ def RegisterItem(user_id, _uuid):
         return False
 
     # first idx
-    uuid = _uuid + '-1'
+   #  uuid = _uuid + '-1'
 
     data = {
         'user_id': user_id,
-        'uuid': uuid,
+        'uuid': _uuid,
+        'ont_id': ont_id,
         'position': user_possition,
-        'timestamp': timestamp,
+        'timestamp': timestamp
     }
 
+    # Deserialize
     serialized_data = Serialize(data)
+    Notify(['serialized_data', serialized_data])
 
-    Put(ctx, uuid, data)
+    Put(ctx, _uuid, serialized_data)
 
     return True
 
-def Transfer(domain, to):
+def  Transfer(domain, to):
     if to == None:
         return False
 
@@ -107,7 +142,7 @@ def Transfer(domain, to):
 
     return True
 
-def DeleteDomain(domain):
+def  DeleteDomain(domain):
     context = GetContext()
     owner = Get(context, domain)
     is_owner = CheckWitness(owner)
