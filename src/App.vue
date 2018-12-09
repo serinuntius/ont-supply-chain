@@ -1,5 +1,6 @@
 <template>
-  <div id="app">
+  <div id="app" class="container">
+
 
     <nav class="navbar" role="navigation" aria-label="main navigation">
       <div class="navbar-brand">
@@ -65,50 +66,32 @@
 
     <div id="role-selector" class="columns is-mobile">
       <div class="column has-text-centered">
-        <button class="button is-info is-outlined">Producer</button>
+        <button class="button is-info is-outlined" @click="scanForRegisterItem">Producer</button>
       </div>
       <div class="column has-text-centered">
-        <button class="button is-info is-outlined">Super Market</button>
+          <button class="button is-info is-outlined">Super Market</button>
       </div>
       <div class="column has-text-centered">
-        <button class="button is-info is-outlined">Customer</button>
+          <button class="button is-info is-outlined" @click="verifyItem">Customer</button>
       </div>
     </div>
-    <div class="columns">
-      <div class="column is-12">
-      </div>
-    </div>
-
 
     <video id="preview"></video>
 
 
-    <div class="columns is-mobile">
-      <div class="column has-text-centered">
-        <button class="button is-primary">
-         <span id="camera-icon">
-           <i class="fas fa-camera"></i>
-         </span> Scan
-          <input type=file accept="image/*" capture=environment @click="openCamera($event)" onchange="" tabindex=-1>
-        </button>
-        <button class="button is-primary" @click="registerUser">
-          register User
-        </button>
-        <button class="button is-primary" @click="registerItem">
-          register item
-        </button>
-        <button class="button is-primary" @click="createID2">
-          create id
-        </button>
-        <button class="button is-primary" @click="createAccount">
-          create Account
-        </button>
-        <button class="button is-primary" @click="importAccount">
-          import Account
-        </button>
-        <button class="button is-primary" @click="importID">
-          import ID
-        </button>
+    <div class="columns is-mobile" v-show="isRegisterUser">
+      <div class="column has-text-centered is-12">
+        <div class="field">
+          <label class="label">ONT ID</label>
+          <div class="control">
+            <input class="input" type="text" placeholder="did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj" v-model="ont_id">
+          </div>
+          <label class="label">Position</label>
+          <div class="control">
+            <input class="input" type="text" placeholder="Tokyo Farm" v-model="position">
+          </div>
+        </div>
+        <button class="button is-primary" @click="registerUser">Register</button>
       </div>
     </div>
   </div>
@@ -123,77 +106,125 @@
 
   // wallet
 
-  let scanner = new Instascan.Scanner({ video: document.getElementById('preview') })
-  scanner.addListener('scan', async function (uuid) {
-    console.log(uuid)
-    alert(uuid)
-
-    // register ONT ID
-
-    const password = 'hogefuga'
-    const label = 'test'
-    const privateKey = Crypto.PrivateKey.random()
-
-    const identity = Identity.create(privateKey, password, label)
-    console.log(identity.toJson())
-
-    const did = identity.ontid
-    // we need the public key, which can be generate from private key
-    const pk = privateKey.getPublicKey()
-    const gasPrice = '500'
-    const gasLimit = '20000'
-    const tx = OntidContract.buildRegisterOntidTx(did, pk, gasPrice, gasLimit)
-
-    const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
-    const account = Account.parseJson(jsonStr)
-
-    tx.payer = account.address
-    // First, we need sign transaction with the private key of the ONT ID.
-    TransactionBuilder.signTransaction(tx, privateKey)
-    // Then sign the transaction with payer's account
-    // we already got transaction created before,add the signature.
-
-    TransactionBuilder.addSign(tx, account.exportPrivateKey(password))
-    const rest = new RestClient(CONST.TEST_ONT_URL.REST_URL)
-    const res = await rest.sendRawTransaction(tx.serialize())
-    console.log(`ont_id_register`)
-    console.log(res)
-  
-    // ONT ID REGISTER END
-  
-    const operation = 'RegisterItem'
-    const args = [{type: 'String', value: 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj'}, { type: 'String', value: identity.ontid }, { type: 'String', value: uuid }]
-    console.log(args)
-    // const gasPrice = 500
-    // const gasLimit = 30000
-
-    const result = await client.api.smartContract.invoke({ scriptHash, operation, args, gasPrice, gasLimit })
-    console.log(result)
-    const msg = utils.hexstr2str(result.result[0])
-    console.log(result.result)
-    console.log(utils.hexstr2str(result.result[0]))
-    console.log(result)
-    alert(msg)
-  })
-
-  Instascan.Camera.getCameras().then(function (cameras) {
-    if (cameras.length > 0) {
-      scanner.start(cameras[0])
-    } else {
-      console.error('No cameras found.')
-    }
-  }).catch(function (e) {
-    console.error(e)
-  })
-
-  const scriptHash = '8f512f0bb6fad262104794020d3ccace8079f692'
+  const scriptHash = 'f600cfbfdf794f2aa39d0eafe7bef0c72838cc82'
 
 export default {
     name: 'app',
+    data: function () {
+      return {
+        ont_id: '',
+        position: '',
+        mode: 'registerUser',
+        isRegisterUser: true
+      }
+    },
     methods: {
+      verifyItem () {
+        this.isRegisterUser = false
+        let scanner = new Instascan.Scanner({ video: document.getElementById('preview') })
+        scanner.addListener('scan', async function (uuid) {
+          console.log(uuid)
+          alert(uuid)
+          await scanner.stop()
+  
+          const operation = 'getItem'
+          const args = [{ type: 'String', value: uuid }]
+          console.log(args)
+          const gasPrice = 500
+          const gasLimit = 30000
+
+          const result = await client.api.smartContract.invokeRead({ scriptHash, operation, args, gasPrice, gasLimit })
+          console.log(result)
+        })
+        Instascan.Camera.getCameras().then(function (cameras) {
+          if (cameras.length > 0) {
+            scanner.start(cameras[0])
+          } else {
+            console.error('No cameras found.')
+          }
+        }).catch(function (e) {
+          console.error(e)
+        })
+      },
+      scanForRegisterItem () {
+        this.isRegisterUser = false
+  
+        let scanner = new Instascan.Scanner({ video: document.getElementById('preview') })
+        scanner.addListener('scan', async function (uuid) {
+          console.log(uuid)
+          alert(uuid)
+
+          // register ONT ID
+
+          const password = 'hogefuga'
+          const label = 'test'
+          const privateKey = Crypto.PrivateKey.random()
+
+          const identity = Identity.create(privateKey, password, label)
+          console.log(identity.toJson())
+
+          const did = identity.ontid
+          // we need the public key, which can be generate from private key
+          const pk = privateKey.getPublicKey()
+          const gasPrice = '500'
+          const gasLimit = '20000'
+          const tx = OntidContract.buildRegisterOntidTx(did, pk, gasPrice, gasLimit)
+
+          const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
+          const account = Account.parseJson(jsonStr)
+
+          tx.payer = account.address
+          // First, we need sign transaction with the private key of the ONT ID.
+          TransactionBuilder.signTransaction(tx, privateKey)
+          // Then sign the transaction with payer's account
+          // we already got transaction created before,add the signature.
+
+          TransactionBuilder.addSign(tx, account.exportPrivateKey(password))
+          const rest = new RestClient(CONST.TEST_ONT_URL.REST_URL)
+          const res = await rest.sendRawTransaction(tx.serialize())
+          console.log(`ont_id_register`)
+          console.log(res)
+
+          // ONT ID REGISTER END
+
+          const operation = 'RegisterItem'
+          const args = [{type: 'String', value: 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj'}, { type: 'String', value: identity.ontid }, { type: 'String', value: uuid }]
+          console.log(args)
+          // const gasPrice = 500
+          // const gasLimit = 30000
+
+          const result = await client.api.smartContract.invoke({ scriptHash, operation, args, gasPrice, gasLimit })
+          console.log(result)
+          await scanner.stop()
+          const msg = utils.hexstr2str(result.result[1])
+          console.log(result.result)
+          alert(msg)
+        })
+
+        Instascan.Camera.getCameras().then(function (cameras) {
+          if (cameras.length > 0) {
+            scanner.start(cameras[0])
+          } else {
+            console.error('No cameras found.')
+          }
+        }).catch(function (e) {
+          console.error(e)
+        })
+      },
       async registerUser () {
         const operation = 'RegisterUser'
-        const args = [{ type: 'String', value: 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj' }, { type: 'String', value: 'Tokyo Super Market' }]
+        // 'did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj'
+        const args = [{ type: 'String', value: this.ont_id }, { type: 'String', value: this.position }]
+        const gasPrice = 500
+        const gasLimit = 30000
+
+        const result = await client.api.smartContract.invoke({ scriptHash, operation, args, gasPrice, gasLimit })
+        console.log(result)
+        alert('success!')
+      },
+      async getItem (uuid) {
+        const operation = 'getItem'
+        const args = [{ type: 'String', value: uuid }]
         const gasPrice = 500
         const gasLimit = 30000
 
