@@ -79,15 +79,19 @@
       </div>
     </div>
 
+
+    <video id="preview"></video>
+
+
     <div class="columns is-mobile">
       <div class="column has-text-centered">
         <button class="button is-primary">
          <span id="camera-icon">
            <i class="fas fa-camera"></i>
          </span> Scan
-          <input type=file accept="image/*" capture=environment @click="openCamera(this)" onchange="" tabindex=-1>
+          <input type=file accept="image/*" capture=environment @click="openCamera($event)" onchange="" tabindex=-1>
         </button>
-        <button class="button is-primary" @click="createID">
+        <button class="button is-primary" @click="createID2">
           create id
         </button>
         <button class="button is-primary" @click="createAccount">
@@ -95,6 +99,9 @@
         </button>
         <button class="button is-primary" @click="importAccount">
           import Account
+        </button>
+        <button class="button is-primary" @click="importID">
+          import ID
         </button>
       </div>
     </div>
@@ -104,11 +111,26 @@
 <script>
   /* eslint-disable no-undef */
 
-  import {Identity, Crypto, OntidContract, RestClient, CONST, Account} from 'ontology-ts-sdk'
+  import {Identity, Crypto, OntidContract, RestClient, CONST, Account, TransactionBuilder} from 'ontology-ts-sdk'
 
   // wallet
 
-  export default {
+  let scanner = new Instascan.Scanner({ video: document.getElementById('preview') })
+  scanner.addListener('scan', function (content) {
+    console.log(content)
+  })
+
+  Instascan.Camera.getCameras().then(function (cameras) {
+    if (cameras.length > 0) {
+      scanner.start(cameras[0])
+    } else {
+      console.error('No cameras found.')
+    }
+  }).catch(function (e) {
+    console.error(e)
+  })
+
+export default {
     name: 'app',
     methods: {
       createAccount () {
@@ -126,49 +148,46 @@
         console.log(account)
         return account
       },
-      createID () {
-        // generate a random private key
-        // const privateKey = Crypto.PrivateKey.random()
-        // console.log(privateKey)
+      importID () {
+        const jsonStr = '{"ontid":"did:ont:AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj","label":"test","lock":false,"isDefault":false,"controls":[{"id":"1","algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"mKoyub/TWWcmBpp1a219LQlLdMLvpMGnd9Jb2hse0wB3u56ohLDupf0LV172xa9G","address":"AJmgNXsSf9U9eddUY2JJB1F1fsuk3uMUUj","salt":"PhzgPJAa4mi2byzVLoqy5Q==","enc-alg":"aes-256-gcm","hash":"sha256","publicKey":"03b8ed33d1dba5c83a894dd3f2ba49bed272953b0d92e28e4ff748751e3035e45d"}]}'
+        const id = Identity.parseJson(jsonStr)
+        console.log(id)
+      },
+      createID2 () {
         const password = 'hogefuga'
-        // const label = 'test'
+        const label = 'test'
+        const privateKey = Crypto.PrivateKey.random()
 
-        // const identity = Identity.create(privateKey, password, label)
-        const identity = Identity.parseJson('{"ontid":"did:ont:AaXidkKV9HrR5dxTJ4WNkg19NSRyc5AHf7","label":"test","lock":false,"isDefault":false,"controls":[{"id":"1","algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"QZ0U2wiPaMquYyaeA1aFXVXz9gMvry3kwspdT1HOMVKqJEmeaoRZ80xn3N0jigfp","address":"AaXidkKV9HrR5dxTJ4WNkg19NSRyc5AHf7","salt":"d4UIuQZ9q6JghFc7eFzZhQ==","enc-alg":"aes-256-gcm","hash":"sha256","publicKey":"02c3544b8ea736920e7d158349144f7cbe08996ca3b685fa79b11c4776518518be"}]}')
+        const identity = Identity.create(privateKey, password, label)
         console.log(identity.toJson())
-        console.log(identity.ontid)
+
         const did = identity.ontid
-
-        console.log(identity.controls[0].address)
-        const _pk = identity.controls[0].publicKey
-        const pk = new Crypto.PublicKey(_pk)
-
-        // const pk = privateKey.getPublicKey()
-        // console.log(pk)
+        // we need the public key, which can be generate from private key
+        const pk = privateKey.getPublicKey()
         const gasPrice = '500'
         const gasLimit = '20000'
         const tx = OntidContract.buildRegisterOntidTx(did, pk, gasPrice, gasLimit)
-        identity.signTransaction(password, tx)
 
-        // TransactionBuilder.signTransaction(tx, privateKey)
-  
-        /* const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
+        const jsonStr = '{"address":"AM9GbRDpqHgbqrGDZNzgPaB6aGDVpsguc7","label":"test","lock":false,"algorithm":"ECDSA","parameters":{"curve":"P-256"},"key":"EFv1tEiQN5aeLaV+ecu9gn2I6cBSn6gMlUrO43To3G0mJ85+tGFGFGuW/doeP0Ee","enc-alg":"aes-256-gcm","hash":"sha256","salt":"/IoiUsK8WdLafyJj8rJTfg==","isDefault":false,"publicKey":"037788013ccd0eaa8e44379635ef3d8fe5dde96ca65743ab1ceab21991fbbe2cda","signatureScheme":"SHA256withECDSA"}'
         const account = Account.parseJson(jsonStr)
-        console.log(`address: ${account.address.value}`)
 
         tx.payer = account.address
-        const signedTx = account.signTransaction('hogefuga', tx)
-        // TransactionBuilder.addSign(tx, privateKeyOfAccount)
+        // First, we need sign transaction with the private key of the ONT ID.
+        TransactionBuilder.signTransaction(tx, privateKey)
+        // Then sign the transaction with payer's account
+        // we already got transaction created before,add the signature.
 
-        */
-
+        TransactionBuilder.addSign(tx, account.exportPrivateKey(password))
         const rest = new RestClient(CONST.TEST_ONT_URL.REST_URL)
         rest.sendRawTransaction(tx.serialize()).then(res => {
           console.log(res)
           alert('hoge')
         })
       },
-      openCamera (node) {
+      openCamera (e) {
+        const node = e.toElement
+        console.log(e)
+        console.log(node)
         const reader = new FileReader()
         reader.onload = function () {
           qrcode.callback = function (res) {
